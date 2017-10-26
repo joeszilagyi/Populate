@@ -3,20 +3,20 @@
 ##
 ## Get constantly updating, expanding, and drifting content
 ## designed/intended to always scale to the maximum size of
-## a cluster, whether it's minimum number or maximun number
-## of nodes. It's basic design if ran off of serveral
-## 'generator' hosts can be complementary and work in tandem
+## a disk/file system...
+## It's basic design if ran off of serveral 'generator' hosts 
+## can be complementary and work in tandem; their actions 
+## ought to be complementary, or at worst not overly get into 
+## each others' way. 
 ##
 ## Author: Joe Szilagyi
-## Version: 0.01 / 10-25-2017
-
-#!/bin/bash
-
+## Version: 0.03 / 10-26-2017
 
 ####################
 ### to-do /ideas ###
 ####################
 
+# note - not yet set up to actually work with a cluster
 # right now it just spins up traffic/noise locally
 #
 # storage access test - network, is it up?
@@ -28,7 +28,11 @@
 # integrate sequence.sh for what do with individual file activities
 # multi threading
 # distributed system(s)
+# integrate/roll logging up into a central system if distributed
 
+# begin
+
+#!/bin/bash
 
 #####################
 ### key variables ###
@@ -46,7 +50,11 @@ storagebase=/home/ifs #defines base level of storage location
 logfiledir=/var/log #defines our base log file directory
 logfile=$logfiledir/populator.log
 maxlogsize=4294967292 #max size of our log file before rotation
-
+maxdiskusage=10 # represented as percentage of df output
+#maxdiskusage=6 # represented as percentage of df output // tiny number for testing cull function
+### fixed values / don't edit ###
+filemanifestfile=/tmp/filemanifest.txt # used for when we do disk capacity clean-up
+directorymanifesfile=/tmp/directorymanifest.txt # used for when we do disk capacity clean-up
 
 
 
@@ -148,14 +156,12 @@ done
 function is_system_over_quota { #basically making sure there's *something* in the user folders
 echo "is_system_over_quota"
 currentdiskusage=`df -h|grep $primarystorage|awk '{print $5}'|sed s/"%"//g`
-maxdiskusage=85 # represented as percentage of df output
-#maxdiskusage=6 # represented as percentage of df output // tiny number for testing cull function
 
 ## run the while true loop to deal with it
 while [ $currentdiskusage -gt $maxdiskusage ]
   do
-    find $storagebase -type f -printf "%T+\t%p\n" | sort -r|awk '{print $2}'|head -10000 > $storagebase/deletemanifest.txt # find the oldest files we got
-    for deleted in `cat $storagebase/deletemanifest.txt`; do # delete 100 at a time
+    find $storagebase -type f -printf "%T+\t%p\n" | sort -r|awk '{print $2}'|head -1000|grep -v deletemanifest > $storagebase/deletemanifest.txt # find the oldest files we got
+    for deleted in `cat $storagebase/deletemanifest.txt`; do # delete 1000 at a time
       echo "$toolname `date +"%m-%d-%Y %T"` WARNING QUOTA Deleting $deleted under $storagebase to fix quota issues." >> $logfile
       rm -f $deleted;
   done
@@ -179,9 +185,6 @@ done
 # use this to reduce number of needed searches/find's
 # on what we want to do; it's our cache of file names
 # we may have some discrepencies - moved/deleted files etc.
-filemanifestfile=/tmp/filemanifest.txt
-directorymanifesfile=/tmp/directorymanifest.txt
-
 filemanifest() {
 echo "filemanifest"
 if [ -f $storagebase/$filemanifestfile ]; then # does the manifest exist?
@@ -312,4 +315,4 @@ filesequence; # make stuff happen / work the file storage
 
 
 
-exit 0
+exit 0  
